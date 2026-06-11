@@ -81,23 +81,23 @@ class Manager:
             version_blocks = []
             if remarkable_version is None or remarkable_version == HardwareType.RMPPURE:
                 version_blocks.append(
-                    f"{remarkable_version.formatted_name}:\n{remarkable_ppure_versions}"
+                    f"{HardwareType.RMPPURE.formatted_name}:\n{remarkable_ppure_versions}"
                 )
             if remarkable_version is None or remarkable_version == HardwareType.RMPP:
                 version_blocks.append(
-                    f"{remarkable_version.formatted_name}:\n{remarkable_pp_versions}"
+                    f"{HardwareType.RMPP.formatted_name}:\n{remarkable_pp_versions}"
                 )
             if remarkable_version is None or remarkable_version == HardwareType.RMPPM:
                 version_blocks.append(
-                    f"{remarkable_version.formatted_name}:\n{remarkable_ppm_versions}"
+                    f"{HardwareType.RMPPM.formatted_name}:\n{remarkable_ppm_versions}"
                 )
             if remarkable_version is None or remarkable_version == HardwareType.RM2:
                 version_blocks.append(
-                    f"{remarkable_version.formatted_name}:\n{remarkable_2_versions}"
+                    f"{HardwareType.RM2.formatted_name}:\n{remarkable_2_versions}"
                 )
             if remarkable_version is None or remarkable_version == HardwareType.RM1:
                 version_blocks.append(
-                    f"{remarkable_version.formatted_name}:\n{remarkable_1_versions}"
+                    f"{HardwareType.RM1.formatted_name}:\n{remarkable_1_versions}"
                 )
 
             print("\n\n".join(version_blocks))
