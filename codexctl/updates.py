@@ -1,15 +1,14 @@
-import os
-import requests
-import uuid
-import sys
-import json
 import hashlib
+import json
 import logging
-
-from pathlib import Path
-from datetime import datetime
-
+import os
+import sys
+import uuid
 import xml.etree.ElementTree as ET
+from datetime import datetime
+from pathlib import Path
+
+import requests
 
 from .device import HardwareType
 
@@ -28,6 +27,7 @@ class UpdateManager:
             self.logger = logging
 
         (
+            self.remarkableppure_versions,
             self.remarkablepp_versions,
             self.remarkableppm_versions,
             self.remarkable2_versions,
@@ -83,7 +83,9 @@ class UpdateManager:
 
         self.logger.debug(f"Version ids contents are {contents}")
 
-        provider_urls = contents.get("external-provider-urls", contents.get("external-provider-url"))
+        provider_urls = contents.get(
+            "external-provider-urls", contents.get("external-provider-url")
+        )
         if provider_urls is None:
             raise SystemError(
                 f"version-ids.json at {file_location} is missing external provider URLs. "
@@ -94,6 +96,7 @@ class UpdateManager:
             provider_urls = [provider_urls]
 
         return (
+            contents.get("remarkableppure", {}),
             contents.get("remarkablepp", {}),
             contents.get("remarkableppm", {}),
             contents.get("remarkable2", {}),
@@ -139,12 +142,18 @@ class UpdateManager:
         match hardware_type:
             case HardwareType.RM1:
                 versions = self.remarkable1_versions
+
             case HardwareType.RM2:
                 versions = self.remarkable2_versions
+
             case HardwareType.RMPP:
                 versions = self.remarkablepp_versions
+
             case HardwareType.RMPPM:
                 versions = self.remarkableppm_versions
+
+            case HardwareType.RMPPURE:
+                versions = self.remarkableppure_versions
 
         return self.__max_version(versions.keys())
 
@@ -178,7 +187,10 @@ class UpdateManager:
         )
 
     def download_version(
-        self, hardware_type: HardwareType, update_version: str, download_folder: str|None = None
+        self,
+        hardware_type: HardwareType,
+        update_version: str,
+        download_folder: str | None = None,
     ) -> str | None:
         """Downloads the specified version of the update
 
@@ -192,14 +204,16 @@ class UpdateManager:
         """
 
         if download_folder is None:
-            download_folder = str(Path(
-                os.environ["XDG_DOWNLOAD_DIR"]
-                if (
-                    "XDG_DOWNLOAD_DIR" in os.environ
-                    and os.path.exists(os.environ["XDG_DOWNLOAD_DIR"])
+            download_folder = str(
+                Path(
+                    os.environ["XDG_DOWNLOAD_DIR"]
+                    if (
+                        "XDG_DOWNLOAD_DIR" in os.environ
+                        and os.path.exists(os.environ["XDG_DOWNLOAD_DIR"])
+                    )
+                    else Path.home() / "Downloads"
                 )
-                else Path.home() / "Downloads"
-            ))
+            )
 
         if not os.path.exists(download_folder):
             self.logger.error(
@@ -211,6 +225,9 @@ class UpdateManager:
         BASE_URL_V3 = "https://updates-download.cloud.remarkable.engineering/build/reMarkable%20Device/reMarkable"
 
         match hardware_type:
+            case HardwareType.RMPPURE:
+                version_lookup = self.remarkableppure_versions
+
             case HardwareType.RMPP:
                 version_lookup = self.remarkablepp_versions
 
@@ -236,7 +253,9 @@ class UpdateManager:
             BASE_URL = BASE_URL_V3
 
         if version <= (3, 11, 2, 5):
-            file_name = f"{update_version}_{hardware_type.old_download_hw}-{version_id}.signed"
+            file_name = (
+                f"{update_version}_{hardware_type.old_download_hw}-{version_id}.signed"
+            )
             file_url = f"{BASE_URL}/{update_version}/{file_name}"
             self.logger.debug(f"File URL is {file_url}, File name is {file_name}")
             return self.__download_version_file(
@@ -258,7 +277,9 @@ class UpdateManager:
                     self.logger.debug(f"Successfully downloaded from {provider_url}")
                     return result
 
-                self.logger.debug(f"Failed to download from {provider_url}, trying next source...")
+                self.logger.debug(
+                    f"Failed to download from {provider_url}, trying next source..."
+                )
 
             self.logger.error(f"Failed to download {file_name} from all sources")
             return None
@@ -399,7 +420,9 @@ class UpdateManager:
         return tuple([int(x) for x in version.split(".")]) >= (3, 11, 2, 5)
 
     @staticmethod
-    def is_bootloader_boundary_downgrade(current_version: str, target_version: str) -> bool:
+    def is_bootloader_boundary_downgrade(
+        current_version: str, target_version: str
+    ) -> bool:
         """
         Checks if downgrade crosses the 3.22 bootloader boundary (3.22+ -> <3.22).
 
@@ -422,8 +445,8 @@ class UpdateManager:
             raise ValueError("target_version cannot be empty")
 
         try:
-            current_parts = [int(x) for x in current_version.split('.')]
-            target_parts = [int(x) for x in target_version.split('.')]
+            current_parts = [int(x) for x in current_version.split(".")]
+            target_parts = [int(x) for x in target_version.split(".")]
         except ValueError as e:
             raise ValueError(f"Invalid version format: {e}") from e
 

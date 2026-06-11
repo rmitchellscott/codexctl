@@ -555,6 +555,12 @@
             "b494b36e6c1749bbe205ef26f2cea31728f6fe82aa5abf5057e37a09ec326ffa"
         ]
     },
+    "remarkableppure": {
+        "3.27.1.0": [
+            "remarkable-production-image-3.27.1.0-tatsu-public.swu",
+            "7008c8376e49a65b766bbd672f83454d55290af73b099bba396f3d9b2276ce3f"
+        ]
+    },
     "last-updated": 1778173895,
     "external-provider-urls": [
         "https://storage.googleapis.com/remarkable-versions/REPLACE_ID",

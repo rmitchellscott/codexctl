@@ -43,8 +43,11 @@ class RmWebInterfaceAPI:  # TODO: Add docstrings
             return None
 
     def __get_documents_recursive(
-        self, folderId="", currentLocation="", currentDocuments=[]
+        self, folderId="", currentLocation="", currentDocuments=None
     ):
+        if currentDocuments is None:
+            currentDocuments = []
+
         data = self.__POST(f"documents/{folderId}")
 
         for item in data:
@@ -209,7 +212,7 @@ class RmWebInterfaceAPI:  # TODO: Add docstrings
         if len(errors) > 0:
             print("The following files failed to upload: " + ",".join(errors))
 
-        print(f"Done! {len(documents)-len(errors)} files were uploaded.")
+        print(f"Done! {len(documents) - len(errors)} files were uploaded.")
 
     def sync(
         self,
