@@ -1,15 +1,15 @@
+import contextlib
+import difflib
+import logging
 import os
 import sys
-import difflib
-import contextlib
-import logging
 from unittest.mock import NonCallableMock
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from codexctl.device import HardwareType, DeviceManager
-from codexctl.updates import UpdateManager
 from codexctl import Manager
+from codexctl.device import DeviceManager, HardwareType
+from codexctl.updates import UpdateManager
 
 # Mock device manager object, only the `logger` field is accessed by `set_server_config`
 device_manager = NonCallableMock(["logger"])
@@ -18,13 +18,13 @@ set_server_config = DeviceManager.set_server_config
 codexctl = Manager(device="reMarkable2", logger=logging.getLogger(__name__))
 updater = UpdateManager(logger=logging.getLogger(__name__))
 
-from io import StringIO
-from io import BytesIO
+from io import BytesIO, StringIO
 
 FAILED = False
 UPDATE_FILE_PATH = ".venv/2.15.1.1189_reMarkable2-wVbHkgKisg-.signed"
 
 assert os.path.exists(UPDATE_FILE_PATH), "Update image missing"
+
 
 class BufferWriter:
     def __init__(self, buffer):
@@ -63,6 +63,7 @@ def assert_gt(msg, value, expected):
     print("fail")
     print(f"  {value} != {expected}")
 
+
 @contextlib.contextmanager
 def assert_raises(msg, expected):
     global FAILED
@@ -79,6 +80,7 @@ def assert_raises(msg, expected):
     FAILED = True
     print("fail")
     print(f"  {got} != {expected.__name__}")
+
 
 def test_set_server_config(original, expected):
     global FAILED
@@ -102,7 +104,7 @@ def test_ls(path, expected):
     print(f"Testing ls {path}: ", end="")
     with contextlib.redirect_stdout(StringIO()) as f:
         try:
-            codexctl.call_func("ls", {'file': UPDATE_FILE_PATH, 'target_path': path})
+            codexctl.call_func("ls", {"file": UPDATE_FILE_PATH, "target_path": path})
 
         except SystemExit:
             pass
@@ -126,7 +128,7 @@ def test_cat(path, expected):
     print(f"Testing cat {path}: ", end="")
     with contextlib.redirect_stdout(BufferBytesIO()) as f:
         try:
-            codexctl.call_func("cat", {'file': UPDATE_FILE_PATH, 'target_path': path})
+            codexctl.call_func("cat", {"file": UPDATE_FILE_PATH, "target_path": path})
         except SystemExit:
             pass
 
@@ -199,49 +201,47 @@ test_ls(
 test_cat("/etc/version", b"20221026104022\n")
 
 assert_gt(
-    "toltec rm1 version",
-    updater.get_toltec_version(HardwareType.RM1),
-    "3.3.2.1666"
+    "toltec rm1 version", updater.get_toltec_version(HardwareType.RM1), "3.3.2.1666"
 )
 assert_gt(
-    "toltec rm2 version",
-    updater.get_toltec_version(HardwareType.RM2),
-    "3.3.2.1666"
+    "toltec rm2 version", updater.get_toltec_version(HardwareType.RM2), "3.3.2.1666"
 )
 with assert_raises("toltec rmpp version", SystemExit):
     updater.get_toltec_version(HardwareType.RMPP)
 with assert_raises("toltec rmppm version", SystemExit):
     updater.get_toltec_version(HardwareType.RMPPM)
+with assert_raises("toltec rmppure version", SystemExit):
+    updater.get_toltec_version(HardwareType.RMPPURE)
 
 assert_value(
     "boundary cross 3.23->3.20",
     UpdateManager.is_bootloader_boundary_downgrade("3.23.0.64", "3.20.0.92"),
-    True
+    True,
 )
 assert_value(
     "boundary cross 3.22->3.20",
     UpdateManager.is_bootloader_boundary_downgrade("3.22.0.64", "3.20.0.92"),
-    True
+    True,
 )
 assert_value(
     "no boundary 3.23->3.22",
     UpdateManager.is_bootloader_boundary_downgrade("3.23.0.64", "3.22.0.64"),
-    False
+    False,
 )
 assert_value(
     "no boundary 3.20->3.19",
     UpdateManager.is_bootloader_boundary_downgrade("3.20.0.92", "3.19.0.82"),
-    False
+    False,
 )
 assert_value(
     "upgrade 3.20->3.22",
     UpdateManager.is_bootloader_boundary_downgrade("3.20.0.92", "3.22.0.64"),
-    False
+    False,
 )
 assert_value(
     "same version 3.22->3.22",
     UpdateManager.is_bootloader_boundary_downgrade("3.22.0.64", "3.22.0.64"),
-    False
+    False,
 )
 with assert_raises("empty string current", ValueError):
     UpdateManager.is_bootloader_boundary_downgrade("", "3.20.0.92")

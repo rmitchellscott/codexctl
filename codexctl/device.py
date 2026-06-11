@@ -23,6 +23,7 @@ class HardwareType(enum.Enum):
     RM2 = enum.auto()
     RMPP = enum.auto()
     RMPPM = enum.auto()
+    RMPPURE = enum.auto()
 
     @classmethod
     def parse(cls, device_type: str) -> "HardwareType":
@@ -36,11 +37,22 @@ class HardwareType(enum.Enum):
             case "2" | "rm2" | "remarkable 2" | "remarkable 2.0":
                 return cls.RM2
 
-            case "1" | "rm1" | "remarkable 1" | "remarkable 1.0" | "remarkable prototype 1":
+            case (
+                "1"
+                | "rm1"
+                | "remarkable 1"
+                | "remarkable 1.0"
+                | "remarkable prototype 1"
+            ):
                 return cls.RM1
 
+            case "ppure" | "rmppure" | "tatsu" | "remarkable tatsu":
+                return cls.RMPPURE
+
             case _:
-                raise ValueError(f"Unknown hardware version: {device_type} (rm1, rm2, rmpp, rmppm)")
+                raise ValueError(
+                    f"Unknown hardware version: {device_type} (rm1, rm2, rmpp, rmppm)"
+                )
 
     @property
     def old_download_hw(self):
@@ -49,10 +61,10 @@ class HardwareType(enum.Enum):
                 return "reMarkable"
             case HardwareType.RM2:
                 return "reMarkable2"
-            case HardwareType.RMPP:
-                raise ValueError("reMarkable Paper Pro does not support the old update engine")
-            case HardwareType.RMPPM:
-                raise ValueError("reMarkable Paper Pro Move does not support the old update engine")
+            case HardwareType.RMPP | HardwareType.RMPPM | HardwareType.RMPPURE:
+                raise ValueError(
+                    f"{self.formatted_name} does not support the old update engine"
+                )
 
     @property
     def new_download_hw(self):
@@ -65,6 +77,8 @@ class HardwareType(enum.Enum):
                 return "rmpp"
             case HardwareType.RMPPM:
                 return "rmppm"
+            case HardwareType.RMPPURE:
+                return "rmppure"
 
     @property
     def swupdate_hw(self):
@@ -77,6 +91,22 @@ class HardwareType(enum.Enum):
                 return "ferrari"
             case HardwareType.RMPPM:
                 return "chiappa"
+            case HardwareType.RMPPURE:
+                return "tatsu"
+
+    @property
+    def formatted_name(self):
+        match self:
+            case HardwareType.RM1:
+                return "reMarkable 1"
+            case HardwareType.RM2:
+                return "reMarkable 2"
+            case HardwareType.RMPP:
+                return "reMarkable Paper Pro"
+            case HardwareType.RMPPM:
+                return "reMarkable Paper Pro Move"
+            case HardwareType.RMPPURE:
+                return "reMarkable Paper Pure"
 
     @property
     def toltec_type(self):
@@ -85,10 +115,9 @@ class HardwareType(enum.Enum):
                 return "rm1"
             case HardwareType.RM2:
                 return "rm2"
-            case HardwareType.RMPP:
-                raise ValueError("reMarkable Paper Pro does not support toltec")
-            case HardwareType.RMPPM:
-                raise ValueError("reMarkable Paper Pro Move does not support toltec")
+            case HardwareType.RMPP | HardwareType.RMPPM | HardwareType.RMPPURE:
+                raise ValueError(f"{self.formatted_name} does not support toltec")
+
 
 class DeviceManager:
     def __init__(
@@ -292,7 +321,9 @@ class DeviceManager:
 
         return client
 
-    def _read_version_from_path(self, ftp=None, base_path: str = "") -> tuple[str, bool]:
+    def _read_version_from_path(
+        self, ftp=None, base_path: str = ""
+    ) -> tuple[str, bool]:
         """Reads version from a given path (current partition or mounted backup)
 
         Args:
@@ -302,10 +333,17 @@ class DeviceManager:
         Returns:
             tuple: (version_string, old_update_engine_boolean)
         """
-        update_conf_path = f"{base_path}/usr/share/remarkable/update.conf" if base_path else "/usr/share/remarkable/update.conf"
-        os_release_path = f"{base_path}/etc/os-release" if base_path else "/etc/os-release"
+        update_conf_path = (
+            f"{base_path}/usr/share/remarkable/update.conf"
+            if base_path
+            else "/usr/share/remarkable/update.conf"
+        )
+        os_release_path = (
+            f"{base_path}/etc/os-release" if base_path else "/etc/os-release"
+        )
 
         if ftp:
+
             def file_exists(path: str) -> bool:
                 try:
                     ftp.stat(path)
@@ -328,7 +366,9 @@ class DeviceManager:
             match = re.search("(?<=REMARKABLE_RELEASE_VERSION=).*", contents)
             if match:
                 return match.group(), True
-            raise SystemError(f"REMARKABLE_RELEASE_VERSION not found in {update_conf_path}")
+            raise SystemError(
+                f"REMARKABLE_RELEASE_VERSION not found in {update_conf_path}"
+            )
 
         if file_exists(os_release_path):
             contents = read_file(os_release_path)
@@ -337,7 +377,9 @@ class DeviceManager:
                 return match.group().strip('"'), False
             raise SystemError(f"IMG_VERSION not found in {os_release_path}")
 
-        raise SystemError(f"Cannot read version from {base_path or 'current partition'}: no version file found")
+        raise SystemError(
+            f"Cannot read version from {base_path or 'current partition'}: no version file found"
+        )
 
     def _get_active_device(self) -> str:
         """Gets the active root device path.
@@ -348,7 +390,11 @@ class DeviceManager:
         Raises:
             SystemError: If command fails or returns no output
         """
-        if self.hardware in (HardwareType.RMPP, HardwareType.RMPPM):
+        if self.hardware in (
+            HardwareType.RMPP,
+            HardwareType.RMPPM,
+            HardwareType.RMPPURE,
+        ):
             cmd = "swupdate -g"
         else:
             cmd = "rootdev"
@@ -359,12 +405,16 @@ class DeviceManager:
             exit_status = stdout.channel.recv_exit_status()
             if exit_status != 0 or not output:
                 error = stderr.read().decode("utf-8", errors="ignore")
-                raise SystemError(f"Failed to get active device using '{cmd}': {error or 'no output'}")
+                raise SystemError(
+                    f"Failed to get active device using '{cmd}': {error or 'no output'}"
+                )
             return output
         else:
             result = subprocess.run(cmd.split(), capture_output=True, text=True)
             if result.returncode != 0 or not result.stdout.strip():
-                raise SystemError(f"Failed to get active device using '{cmd}': {result.stderr or 'no output'}")
+                raise SystemError(
+                    f"Failed to get active device using '{cmd}': {result.stderr or 'no output'}"
+                )
             return result.stdout.strip()
 
     def _parse_partition_info(self, active_device: str) -> tuple[int, int, str]:
@@ -376,9 +426,9 @@ class DeviceManager:
         Returns:
             tuple: (active_part, inactive_part, device_base)
         """
-        active_part = int(active_device.split('p')[-1])
+        active_part = int(active_device.split("p")[-1])
         inactive_part = 3 if active_part == 2 else 2
-        device_base = re.sub(r'p\d+$', '', active_device)
+        device_base = re.sub(r"p\d+$", "", active_device)
         return active_part, inactive_part, device_base
 
     def _get_backup_partition_version(self) -> str:
@@ -404,7 +454,7 @@ class DeviceManager:
                 exit_status = stdout.channel.recv_exit_status()
 
                 if exit_status != 0:
-                    error_msg = _stderr.read().decode('utf-8')
+                    error_msg = _stderr.read().decode("utf-8")
                     raise SystemError(f"Failed to mount backup partition: {error_msg}")
 
                 try:
@@ -416,11 +466,20 @@ class DeviceManager:
             else:
                 os.makedirs(mount_point, exist_ok=True)
                 result = subprocess.run(
-                    ["mount", "-o", "ro", f"{device_base}p{inactive_part}", mount_point],
-                    capture_output=True, text=True
+                    [
+                        "mount",
+                        "-o",
+                        "ro",
+                        f"{device_base}p{inactive_part}",
+                        mount_point,
+                    ],
+                    capture_output=True,
+                    text=True,
                 )
                 if result.returncode != 0:
-                    raise SystemError(f"Failed to mount backup partition: {result.stderr}")
+                    raise SystemError(
+                        f"Failed to mount backup partition: {result.stderr}"
+                    )
 
                 try:
                     version, _ = self._read_version_from_path(base_path=mount_point)
@@ -429,11 +488,17 @@ class DeviceManager:
                     subprocess.run(["umount", mount_point])
                     subprocess.run(["rm", "-rf", mount_point])
         except SystemError:
-            if self.hardware in (HardwareType.RMPP, HardwareType.RMPPM):
+            if self.hardware in (
+                HardwareType.RMPP,
+                HardwareType.RMPPM,
+                HardwareType.RMPPURE,
+            ):
                 raise
             return ""
 
-    def _get_paper_pro_partition_info(self, current_version: str) -> tuple[int, int, int]:
+    def _get_paper_pro_partition_info(
+        self, current_version: str
+    ) -> tuple[int, int, int]:
         """Gets partition information for Paper Pro devices
 
         Args:
@@ -445,11 +510,13 @@ class DeviceManager:
         active_device = self._get_active_device()
         current_part, inactive_part, _ = self._parse_partition_info(active_device)
 
-        parts = current_version.split('.')
+        parts = current_version.split(".")
         if len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit():
             is_new_version = [int(parts[0]), int(parts[1])] >= [3, 22]
         else:
-            raise SystemError(f"Cannot detect partition scheme: unexpected version format '{current_version}'")
+            raise SystemError(
+                f"Cannot detect partition scheme: unexpected version format '{current_version}'"
+            )
 
         next_boot_part = current_part
 
@@ -511,7 +578,8 @@ class DeviceManager:
             self.logger.debug("Connected")
 
             xochitl_version, old_update_engine = self._read_version_from_path(ftp)
-            def exists(path:str) -> bool:
+
+            def exists(path: str) -> bool:
                 try:
                     _ = ftp.stat(path)
                     return True
@@ -534,7 +602,9 @@ class DeviceManager:
                     version_id = file.read().rstrip()
 
             if os.path.exists("/home/root/.config/remarkable/xochitl.conf"):
-                with open("/home/root/.config/remarkable/xochitl.conf", encoding="utf-8") as file:
+                with open(
+                    "/home/root/.config/remarkable/xochitl.conf", encoding="utf-8"
+                ) as file:
                     beta_contents = file.read().rstrip()
 
         beta_possible = re.search("(?<=GROUP=).*", beta_contents)
@@ -641,21 +711,31 @@ echo "fallback: ${OLDPART}"
 /sbin/fw_setenv "fallback_partition" "${OLDPART}"
 /sbin/fw_setenv "active_partition" "${NEWPART}\""""
 
-        if self.hardware in (HardwareType.RMPP, HardwareType.RMPPM):
+        if self.hardware in (
+            HardwareType.RMPP,
+            HardwareType.RMPPM,
+            HardwareType.RMPPURE,
+        ):
             _, _, current_version, _, backup_version = self.get_device_status()
-            current_part, inactive_part, _ = self._get_paper_pro_partition_info(current_version)
+            current_part, inactive_part, _ = self._get_paper_pro_partition_info(
+                current_version
+            )
 
             new_part_label = "a" if inactive_part == 2 else "b"
 
-            parts = current_version.split('.')
+            parts = current_version.split(".")
             if len(parts) < 2 or not parts[0].isdigit() or not parts[1].isdigit():
-                raise SystemError(f"Cannot restore: unexpected current version format '{current_version}'")
+                raise SystemError(
+                    f"Cannot restore: unexpected current version format '{current_version}'"
+                )
 
             current_is_new = [int(parts[0]), int(parts[1])] >= [3, 22]
 
-            parts = backup_version.split('.')
+            parts = backup_version.split(".")
             if len(parts) < 2 or not parts[0].isdigit() or not parts[1].isdigit():
-                raise SystemError(f"Cannot restore: unexpected backup version format '{backup_version}'")
+                raise SystemError(
+                    f"Cannot restore: unexpected backup version format '{backup_version}'"
+                )
 
             target_is_new = [int(parts[0]), int(parts[1])] >= [3, 22]
 
@@ -667,21 +747,27 @@ echo "fallback: ${OLDPART}"
             ]
 
             if not current_is_new:
-                code.extend([
-                    f"echo '{new_part_label}' > /sys/devices/platform/lpgpr/root_part",
-                    "echo 'Set next boot via sysfs (legacy method)'",
-                ])
+                code.extend(
+                    [
+                        f"echo '{new_part_label}' > /sys/devices/platform/lpgpr/root_part",
+                        "echo 'Set next boot via sysfs (legacy method)'",
+                    ]
+                )
 
             if target_is_new or current_is_new:
-                code.extend([
-                    f"mmc bootpart enable {inactive_part - 1} 0 /dev/mmcblk0boot{inactive_part - 2}",
-                    "echo 'Set next boot via mmc bootpart (new method)'",
-                ])
+                code.extend(
+                    [
+                        f"mmc bootpart enable {inactive_part - 1} 0 /dev/mmcblk0boot{inactive_part - 2}",
+                        "echo 'Set next boot via mmc bootpart (new method)'",
+                    ]
+                )
 
-            code.extend([
-                f"echo '0' > /sys/devices/platform/lpgpr/root{new_part_label}_errcnt 2>/dev/null || true",
-                "echo 'Partition switch complete'",
-            ])
+            code.extend(
+                [
+                    f"echo '0' > /sys/devices/platform/lpgpr/root{new_part_label}_errcnt 2>/dev/null || true",
+                    "echo 'Partition switch complete'",
+                ]
+            )
 
             RESTORE_CODE = "\n".join(code)
 
@@ -735,7 +821,9 @@ fi
 
         self.logger.debug("Device rebooted")
 
-    def install_sw_update(self, version_file: str, bootloader_files: dict[str, bytes] | None = None) -> None:
+    def install_sw_update(
+        self, version_file: str, bootloader_files: dict[str, bytes] | None = None
+    ) -> None:
         """
         Installs new version from version file path, utilising swupdate
 
@@ -772,8 +860,8 @@ fi
             if bootloader_files:
                 print("\nApplying bootloader update...")
                 self._update_paper_pro_bootloader(
-                    bootloader_files['update-bootloader.sh'],
-                    bootloader_files['imx-boot']
+                    bootloader_files["update-bootloader.sh"],
+                    bootloader_files["imx-boot"],
                 )
                 print("✓ Bootloader update completed")
 
@@ -805,7 +893,11 @@ fi
 
         else:
             print("Running swupdate")
-            command = ["bash", "-c", f"source /usr/lib/swupdate/conf.d/09-swupdate-args && swupdate $SWUPDATE_ARGS -i {shlex.quote(version_file)}"]
+            command = [
+                "bash",
+                "-c",
+                f"source /usr/lib/swupdate/conf.d/09-swupdate-args && swupdate $SWUPDATE_ARGS -i {shlex.quote(version_file)}",
+            ]
             self.logger.debug(command)
 
             try:
@@ -823,7 +915,9 @@ fi
             print("Update complete and device rebooting")
             os.system("reboot")
 
-    def _update_paper_pro_bootloader(self, bootloader_script: bytes, imx_boot: bytes) -> None:
+    def _update_paper_pro_bootloader(
+        self, bootloader_script: bytes, imx_boot: bytes
+    ) -> None:
         """
         Update bootloader on Paper Pro device for 3.22+ -> <3.22 downgrades.
 
@@ -852,11 +946,15 @@ fi
         script_path = "/tmp/update-bootloader.sh"
         boot_image_path = "/tmp/imx-boot"
 
-        with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.sh') as tmp_script:
+        with tempfile.NamedTemporaryFile(
+            mode="wb", delete=False, suffix=".sh"
+        ) as tmp_script:
             tmp_script.write(bootloader_script)
             tmp_script_path = tmp_script.name
 
-        with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.img') as tmp_boot:
+        with tempfile.NamedTemporaryFile(
+            mode="wb", delete=False, suffix=".img"
+        ) as tmp_boot:
             tmp_boot.write(imx_boot)
             tmp_boot_path = tmp_boot.name
 
@@ -868,7 +966,9 @@ fi
             ftp_client.put(tmp_boot_path, boot_image_path)
 
             self.logger.debug("Making bootloader script executable")
-            _stdin, stdout, _stderr = self.client.exec_command(f"chmod +x {script_path}")
+            _stdin, stdout, _stderr = self.client.exec_command(
+                f"chmod +x {script_path}"
+            )
             stdout.channel.recv_exit_status()
 
             self.logger.info("Running bootloader update script (preinst)")
