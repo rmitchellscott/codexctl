@@ -330,8 +330,8 @@ class Manager:
                 else:
                     version_number = str(version_number)
 
-                update_file_requires_new_engine = UpdateManager.uses_new_update_engine(
-                    version_number
+                update_file_requires_new_engine = (
+                    tuple(int(x) for x in version_number.split(".")) > (3, 11, 2, 5)
                 )
                 device_version_uses_new_engine = UpdateManager.uses_new_update_engine(
                     remarkable.get_device_status()[2]
