@@ -221,9 +221,6 @@ class UpdateManager:
             )
             os.makedirs(download_folder)
 
-        BASE_URL = "https://updates-download.cloud.remarkable.engineering/build/reMarkable%20Device%20Beta/RM110"  # Default URL for v2 versions
-        BASE_URL_V3 = "https://updates-download.cloud.remarkable.engineering/build/reMarkable%20Device/reMarkable"
-
         match hardware_type:
             case HardwareType.RMPPURE:
                 version_lookup = self.remarkableppure_versions
@@ -236,7 +233,6 @@ class UpdateManager:
 
             case HardwareType.RM2:
                 version_lookup = self.remarkable2_versions
-                BASE_URL_V3 += "2"
 
             case HardwareType.RM1:
                 version_lookup = self.remarkable1_versions
@@ -249,40 +245,32 @@ class UpdateManager:
 
         version_id, version_checksum = version_lookup[update_version]
         version = tuple([int(x) for x in update_version.split(".")])
-        if version >= (3,):
-            BASE_URL = BASE_URL_V3
-
         if version <= (3, 11, 2, 5):
             file_name = (
                 f"{update_version}_{hardware_type.old_download_hw}-{version_id}.signed"
-            )
-            file_url = f"{BASE_URL}/{update_version}/{file_name}"
-            self.logger.debug(f"File URL is {file_url}, File name is {file_name}")
-            return self.__download_version_file(
-                file_url, file_name, download_folder, version_checksum
             )
 
         else:
             file_name = f"remarkable-production-memfault-image-{update_version}-{hardware_type.new_download_hw}-public"
 
-            for provider_url in self.external_provider_urls:
-                file_url = provider_url.replace("REPLACE_ID", version_id)
-                self.logger.debug(f"Trying to download from {file_url}")
+        for provider_url in self.external_provider_urls:
+            file_url = provider_url.replace("REPLACE_ID", version_id).replace("REPLACE_NAME", file_name)
+            self.logger.debug(f"Trying to download from {file_url}")
 
-                result = self.__download_version_file(
-                    file_url, file_name, download_folder, version_checksum
-                )
+            result = self.__download_version_file(
+                file_url, file_name, download_folder, version_checksum
+            )
 
-                if result is not None:
-                    self.logger.debug(f"Successfully downloaded from {provider_url}")
-                    return result
+            if result is not None:
+                self.logger.debug(f"Successfully downloaded from {provider_url}")
+                return result
 
-                self.logger.debug(
-                    f"Failed to download from {provider_url}, trying next source..."
-                )
+            self.logger.debug(
+                f"Failed to download from {provider_url}, trying next source..."
+            )
 
-            self.logger.error(f"Failed to download {file_name} from all sources")
-            return None
+        self.logger.error(f"Failed to download {file_name} from all sources")
+        return None
 
     def __generate_xml_data(self) -> str:
         """Generates and returns XML data for the update request"""
